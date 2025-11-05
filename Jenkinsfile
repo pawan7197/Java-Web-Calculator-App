@@ -74,13 +74,13 @@ pipeline {
         }
 
         /* === Stage 5: Deploy to Tomcat === */
-        stage('Deploy to tomcat') {
-            agent { label 'tomcatNode' } // Switch execution to Tomcat node
+        stage('Deploy to tom-cat') {
+            agent { label 'tom-catNode' } // Switch execution to Tomcat node
             steps {
                 echo '🚀 Deploying latest WAR from Nexus to Tomcat...'
                 withCredentials([
                     usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USR', passwordVariable: 'NEXUS_PSW'),
-                    usernamePassword(credentialsId: 'tomcat-manager', usernameVariable: 'TOMCAT_USR', passwordVariable: 'TOMCAT_PSW')
+                    usernamePassword(credentialsId: 'tom-cat-manager', usernameVariable: 'TOMCAT_USR', passwordVariable: 'TOMCAT_PSW')
                 ]) {
                     sh '''
                         cd /tmp
