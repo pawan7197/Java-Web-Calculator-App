@@ -7,10 +7,10 @@ pipeline {
     }
 
     environment {
-        SONARQUBE_SERVER = 'SonarQube'
+        SONARQUBE_SERVER = 'sonar'
         JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
-        NEXUS_URL = 'http://3.227.246.21:8081/repository/maven-releases/'
+        NEXUS_URL = 'http://18.208.221.68:8081/repository/maven-releases/'
         NEXUS_REPO_ID = 'maven-releases'
         MVN_SETTINGS = '/home/jenkins/.m2/settings.xml'
     }
