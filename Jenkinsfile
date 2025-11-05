@@ -24,7 +24,7 @@ pipeline {
                 checkout([$class: 'GitSCM',
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[
-                        url: 'https://github.com/mrtechreddy/Java-Web-Calculator-App.git'
+                        url: 'https://github.com/pawan7197/Java-Web-Calculator-App.git'
                     ]]
                 ])
             }
