@@ -74,8 +74,8 @@ pipeline {
         }
 
         /* === Stage 5: Deploy to Tomcat === */
-        stage('Deploy to Tomcat') {
-            agent { label 'TomcatNode' } // Switch execution to Tomcat node
+        stage('Deploy to tomcat') {
+            agent { label 'tomcatNode' } // Switch execution to Tomcat node
             steps {
                 echo '🚀 Deploying latest WAR from Nexus to Tomcat...'
                 withCredentials([
