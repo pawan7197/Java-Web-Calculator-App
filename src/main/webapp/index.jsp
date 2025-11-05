@@ -22,10 +22,7 @@
 <input type="radio" name="r1" value="sub" />subraction
 <br />
 </label>
-<label>
-<input type="radio" name="r1" value="prod" />production
-<br />
-</label>
+
 
 
 
