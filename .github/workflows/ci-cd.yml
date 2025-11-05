@@ -1,4 +1,4 @@
-name: Java CI/CD - SonarQube, Nexus, Tomcat (Clean Deploy)
+name: Java CI/CD - SonarQube, Nexus, Tomcat (Force Fresh Deploy)
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    # 3️⃣ Cache Maven
+    # 3️⃣ Cache Maven Dependencies
     - name: 🧰 Cache Maven Dependencies
       uses: actions/cache@v4
       with:
@@ -40,7 +40,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-maven-
 
-    # 4️⃣ SonarQube
+    # 4️⃣ SonarQube Code Analysis
     - name: 🔍 Run SonarQube Analysis
       run: |
         mvn clean verify sonar:sonar \
@@ -70,8 +70,8 @@ jobs:
           "${{ env.NEXUS_URL }}/repository/${{ env.NEXUS_REPO }}/${{ env.NEXUS_GROUP }}/${{ env.NEXUS_ARTIFACT }}/${VERSION}/${{ env.NEXUS_ARTIFACT }}-${VERSION}.war"
         echo "✅ Uploaded successfully."
 
-    # 7️⃣ Deploy to Tomcat (Option 1 - Clean Before Deploy)
-    - name: 🚀 Deploy WAR to Tomcat (Clean Before Deploy)
+    # 7️⃣ Clean & Deploy to Tomcat
+    - name: 🚀 Deploy WAR to Tomcat (Force Clean)
       env:
         TOMCAT_USER: ${{ secrets.TOMCAT_USER }}
         TOMCAT_PASS: ${{ secrets.TOMCAT_PASS }}
@@ -96,15 +96,20 @@ jobs:
         WAR_FILE=$(basename "$DOWNLOAD_URL")
         APP_NAME=$(echo "$WAR_FILE" | sed 's/-[0-9].*//')
 
-        echo "🧹 Cleaning old deployment..."
-        curl -u ${TOMCAT_USER}:${TOMCAT_PASS} "${{ env.TOMCAT_URL }}/undeploy?path=/${APP_NAME}" || true
-        sleep 5
+        echo "🧹 Cleaning old deployment and cache..."
+        ssh -o StrictHostKeyChecking=no ubuntu@18.216.0.11 <<EOF
+          sudo systemctl stop tomcat
+          rm -rf /home/ubuntu/apache-tomcat-9.0.111/webapps/${APP_NAME}
+          rm -f /home/ubuntu/apache-tomcat-9.0.111/webapps/${APP_NAME}.war
+          rm -rf /home/ubuntu/apache-tomcat-9.0.111/work/Catalina/localhost/${APP_NAME}
+          sudo systemctl start tomcat
+EOF
 
-        echo "🚀 Deploying fresh WAR..."
+        echo "🚀 Deploying fresh WAR to Tomcat..."
         curl -u ${TOMCAT_USER}:${TOMCAT_PASS} --upload-file "$WAR_FILE" \
           "${{ env.TOMCAT_URL }}/deploy?path=/${APP_NAME}&update=true"
 
-        echo "✅ Deployment successful. App redeployed cleanly."
+        echo "✅ Deployment successful! App redeployed with clean cache."
 
     # 8️⃣ Verify Deployment
     - name: 🔎 Verify Deployment
