@@ -1,4 +1,4 @@
-name: Java CI/CD - SonarQube, Nexus, Tomcat
+name: Java CI/CD - SonarQube, Nexus, Tomcat (Clean Deploy)
 
 on:
   push:
@@ -20,15 +20,18 @@ jobs:
       TOMCAT_URL: http://18.216.0.11:8080/manager/text
 
     steps:
+    # 1️⃣ Checkout
     - name: 📦 Checkout Code
       uses: actions/checkout@v4
 
+    # 2️⃣ Setup Java
     - name: ☕ Setup Java 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
+    # 3️⃣ Cache Maven
     - name: 🧰 Cache Maven Dependencies
       uses: actions/cache@v4
       with:
@@ -37,6 +40,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-maven-
 
+    # 4️⃣ SonarQube
     - name: 🔍 Run SonarQube Analysis
       run: |
         mvn clean verify sonar:sonar \
@@ -45,12 +49,14 @@ jobs:
           -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
+    # 5️⃣ Build WAR
     - name: ⚙️ Build WAR File
       run: |
         mvn clean package -DskipTests
         echo "✅ Build completed!"
         ls -lh target/*.war
 
+    # 6️⃣ Upload to Nexus
     - name: ⬆️ Upload Artifact to Nexus
       env:
         NEXUS_USER: ${{ secrets.NEXUS_USER }}
@@ -64,7 +70,8 @@ jobs:
           "${{ env.NEXUS_URL }}/repository/${{ env.NEXUS_REPO }}/${{ env.NEXUS_GROUP }}/${{ env.NEXUS_ARTIFACT }}/${VERSION}/${{ env.NEXUS_ARTIFACT }}-${VERSION}.war"
         echo "✅ Uploaded successfully."
 
-    - name: 🚀 Deploy WAR to Tomcat (via HTTP)
+    # 7️⃣ Deploy to Tomcat (Option 1 - Clean Before Deploy)
+    - name: 🚀 Deploy WAR to Tomcat (Clean Before Deploy)
       env:
         TOMCAT_USER: ${{ secrets.TOMCAT_USER }}
         TOMCAT_PASS: ${{ secrets.TOMCAT_PASS }}
@@ -91,13 +98,15 @@ jobs:
 
         echo "🧹 Cleaning old deployment..."
         curl -u ${TOMCAT_USER}:${TOMCAT_PASS} "${{ env.TOMCAT_URL }}/undeploy?path=/${APP_NAME}" || true
+        sleep 5
 
-        echo "🚀 Deploying new WAR..."
+        echo "🚀 Deploying fresh WAR..."
         curl -u ${TOMCAT_USER}:${TOMCAT_PASS} --upload-file "$WAR_FILE" \
           "${{ env.TOMCAT_URL }}/deploy?path=/${APP_NAME}&update=true"
 
-        echo "✅ Deployment completed successfully!"
+        echo "✅ Deployment successful. App redeployed cleanly."
 
+    # 8️⃣ Verify Deployment
     - name: 🔎 Verify Deployment
       run: |
         sleep 10
