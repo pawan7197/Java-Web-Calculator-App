@@ -1,4 +1,4 @@
-name: Java CI/CD - SonarQube, Nexus, Tomcat (Clean HTTP Deploy)
+name: Java CI/CD - SonarQube, Nexus, Tomcat (Full Clean Deploy)
 
 on:
   push:
@@ -20,19 +20,16 @@ jobs:
       TOMCAT_URL: http://18.216.0.11:8080/manager/text
 
     steps:
-      # 1️⃣ Checkout Code
-      - name: Checkout Code
+      - name: 📦 Checkout Code
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Java 17
-      - name: Setup Java 17
+      - name: ☕ Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3️⃣ Cache Maven Dependencies
-      - name: Cache Maven Dependencies
+      - name: 🧰 Cache Maven Dependencies
         uses: actions/cache@v4
         with:
           path: ~/.m2
@@ -40,8 +37,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      # 4️⃣ Run SonarQube Analysis
-      - name: Run SonarQube Analysis
+      - name: 🔍 Run SonarQube Analysis
         run: |
           mvn clean verify sonar:sonar \
             -DskipTests \
@@ -49,15 +45,13 @@ jobs:
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-      # 5️⃣ Build WAR Artifact
-      - name: Build WAR File
+      - name: ⚙️ Build WAR File
         run: |
           mvn clean package -DskipTests
           echo "✅ Build completed!"
           ls -lh target/*.war
 
-      # 6️⃣ Upload WAR to Nexus
-      - name: Upload Artifact to Nexus
+      - name: ⬆️ Upload WAR to Nexus
         env:
           NEXUS_USER: ${{ secrets.NEXUS_USER }}
           NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
@@ -70,8 +64,7 @@ jobs:
             "${{ env.NEXUS_URL }}/repository/${{ env.NEXUS_REPO }}/${{ env.NEXUS_GROUP }}/${{ env.NEXUS_ARTIFACT }}/${VERSION}/${{ env.NEXUS_ARTIFACT }}-${VERSION}.war"
           echo "✅ Uploaded successfully."
 
-      # 7️⃣ Deploy WAR to Tomcat via HTTP API
-      - name: Deploy WAR to Tomcat (Clean HTTP Deployment)
+      - name: 🚀 Deploy WAR to Tomcat (Force Clean)
         env:
           TOMCAT_USER: ${{ secrets.TOMCAT_USER }}
           TOMCAT_PASS: ${{ secrets.TOMCAT_PASS }}
@@ -96,24 +89,27 @@ jobs:
           curl -u ${NEXUS_USER}:${NEXUS_PASS} -O "$DOWNLOAD_URL"
           WAR_FILE=$(basename "$DOWNLOAD_URL")
 
-          echo "🧹 Cleaning old deployment from Tomcat..."
+          echo "🧹 Undeploying old application..."
           curl -u ${TOMCAT_USER}:${TOMCAT_PASS} "${{ env.TOMCAT_URL }}/undeploy?path=/${APP_NAME}" || true
           sleep 5
 
-          echo "🚀 Deploying new WAR to Tomcat..."
+          echo "🧼 Cleaning Tomcat cache directories via manager text..."
+          curl -u ${TOMCAT_USER}:${TOMCAT_PASS} "${{ env.TOMCAT_URL }}/expire?path=/${APP_NAME}" || true
+          curl -u ${TOMCAT_USER}:${TOMCAT_PASS} "${{ env.TOMCAT_URL }}/reload?path=/${APP_NAME}" || true
+
+          echo "🚀 Deploying fresh WAR to Tomcat..."
           curl -u ${TOMCAT_USER}:${TOMCAT_PASS} --upload-file "$WAR_FILE" \
             "${{ env.TOMCAT_URL }}/deploy?path=/${APP_NAME}&update=true"
 
           echo "✅ Deployment completed successfully!"
 
-      # 8️⃣ Verify Deployment
-      - name: Verify Deployment
+      - name: 🔎 Verify Deployment
         run: |
-          sleep 10
+          sleep 15
           STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://18.216.0.11:8080/webapp-add/)
           if [ "$STATUS" -eq 200 ]; then
-            echo "✅ Application is live with latest changes!"
+            echo "✅ App is live with the latest code!"
           else
-            echo "⚠️ Application returned status $STATUS"
+            echo "⚠️ App returned status $STATUS"
             exit 1
           fi
