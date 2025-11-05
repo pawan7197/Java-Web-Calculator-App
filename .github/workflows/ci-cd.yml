@@ -1,4 +1,4 @@
-name: Java CI/CD - SonarQube, Nexus, Tomcat (Force Deploy)
+name: Java CI/CD - SonarQube, Nexus, Tomcat
 
 on:
   push:
@@ -64,19 +64,7 @@ jobs:
           "${{ env.NEXUS_URL }}/repository/${{ env.NEXUS_REPO }}/${{ env.NEXUS_GROUP }}/${{ env.NEXUS_ARTIFACT }}/${VERSION}/${{ env.NEXUS_ARTIFACT }}-${VERSION}.war"
         echo "✅ Uploaded successfully."
 
-    - name: 🔑 Setup SSH Access to Tomcat Server
-      env:
-        SSH_KEY: ${{ secrets.SSH_KEY }}
-      run: |
-        mkdir -p ~/.ssh
-        echo "${SSH_KEY}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H 18.216.0.11 >> ~/.ssh/known_hosts
-        eval "$(ssh-agent -s)"
-        ssh-add ~/.ssh/id_rsa
-        echo "✅ SSH connection setup complete."
-
-    - name: 🚀 Deploy WAR to Tomcat (Force Clean)
+    - name: 🚀 Deploy WAR to Tomcat (via HTTP)
       env:
         TOMCAT_USER: ${{ secrets.TOMCAT_USER }}
         TOMCAT_PASS: ${{ secrets.TOMCAT_PASS }}
@@ -101,25 +89,14 @@ jobs:
         WAR_FILE=$(basename "$DOWNLOAD_URL")
         APP_NAME=$(echo "$WAR_FILE" | sed 's/-[0-9].*//')
 
-        echo "🔑 Starting SSH agent..."
-        eval "$(ssh-agent -s)"
-        ssh-add ~/.ssh/id_rsa
-
-        echo "🧹 Cleaning old WAR and exploded folder..."
-        ssh -o StrictHostKeyChecking=no ubuntu@18.216.0.11 "
-          sudo systemctl stop tomcat || true &&
-          rm -rf /home/ubuntu/apache-tomcat-9.0.111/webapps/${APP_NAME} &&
-          rm -f /home/ubuntu/apache-tomcat-9.0.111/webapps/${APP_NAME}.war &&
-          sudo systemctl start tomcat
-        "
+        echo "🧹 Cleaning old deployment..."
+        curl -u ${TOMCAT_USER}:${TOMCAT_PASS} "${{ env.TOMCAT_URL }}/undeploy?path=/${APP_NAME}" || true
 
         echo "🚀 Deploying new WAR..."
         curl -u ${TOMCAT_USER}:${TOMCAT_PASS} --upload-file "$WAR_FILE" \
           "${{ env.TOMCAT_URL }}/deploy?path=/${APP_NAME}&update=true"
 
-        echo "✅ Deployed successfully. Restarting Tomcat..."
-        ssh -o StrictHostKeyChecking=no ubuntu@18.216.0.11 "sudo systemctl restart tomcat"
-        echo "🔥 Tomcat restarted and new version deployed!"
+        echo "✅ Deployment completed successfully!"
 
     - name: 🔎 Verify Deployment
       run: |
