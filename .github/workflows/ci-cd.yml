@@ -20,18 +20,15 @@ jobs:
       TOMCAT_URL: http://18.216.0.11:8080/manager/text
 
     steps:
-    # 1️⃣ Checkout code
     - name: 📦 Checkout Code
       uses: actions/checkout@v4
 
-    # 2️⃣ Setup Java
     - name: ☕ Setup Java 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    # 3️⃣ Cache Maven dependencies
     - name: 🧰 Cache Maven Dependencies
       uses: actions/cache@v4
       with:
@@ -40,7 +37,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-maven-
 
-    # 4️⃣ SonarQube Analysis
     - name: 🔍 Run SonarQube Analysis
       run: |
         mvn clean verify sonar:sonar \
@@ -49,14 +45,12 @@ jobs:
           -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-    # 5️⃣ Build WAR
     - name: ⚙️ Build WAR File
       run: |
         mvn clean package -DskipTests
         echo "✅ Build completed!"
         ls -lh target/*.war
 
-    # 6️⃣ Upload Artifact to Nexus
     - name: ⬆️ Upload Artifact to Nexus
       env:
         NEXUS_USER: ${{ secrets.NEXUS_USER }}
@@ -70,7 +64,6 @@ jobs:
           "${{ env.NEXUS_URL }}/repository/${{ env.NEXUS_REPO }}/${{ env.NEXUS_GROUP }}/${{ env.NEXUS_ARTIFACT }}/${VERSION}/${{ env.NEXUS_ARTIFACT }}-${VERSION}.war"
         echo "✅ Uploaded successfully."
 
-    # 7️⃣ Setup SSH for Tomcat Server
     - name: 🔑 Setup SSH Access to Tomcat Server
       env:
         SSH_KEY: ${{ secrets.SSH_KEY }}
@@ -83,7 +76,6 @@ jobs:
         ssh-add ~/.ssh/id_rsa
         echo "✅ SSH connection setup complete."
 
-    # 8️⃣ Deploy to Tomcat
     - name: 🚀 Deploy WAR to Tomcat (Force Clean)
       env:
         TOMCAT_USER: ${{ secrets.TOMCAT_USER }}
@@ -114,12 +106,12 @@ jobs:
         ssh-add ~/.ssh/id_rsa
 
         echo "🧹 Cleaning old WAR and exploded folder..."
-        ssh -o StrictHostKeyChecking=no ubuntu@18.216.0.11 <<'CLEANUP'
-          sudo systemctl stop tomcat || true
-          rm -rf /home/ubuntu/apache-tomcat-9.0.111/webapps/webapp-add
-          rm -f /home/ubuntu/apache-tomcat-9.0.111/webapps/webapp-add.war
+        ssh -o StrictHostKeyChecking=no ubuntu@18.216.0.11 "
+          sudo systemctl stop tomcat || true &&
+          rm -rf /home/ubuntu/apache-tomcat-9.0.111/webapps/${APP_NAME} &&
+          rm -f /home/ubuntu/apache-tomcat-9.0.111/webapps/${APP_NAME}.war &&
           sudo systemctl start tomcat
-CLEANUP
+        "
 
         echo "🚀 Deploying new WAR..."
         curl -u ${TOMCAT_USER}:${TOMCAT_PASS} --upload-file "$WAR_FILE" \
@@ -129,7 +121,6 @@ CLEANUP
         ssh -o StrictHostKeyChecking=no ubuntu@18.216.0.11 "sudo systemctl restart tomcat"
         echo "🔥 Tomcat restarted and new version deployed!"
 
-    # 9️⃣ Verify App
     - name: 🔎 Verify Deployment
       run: |
         sleep 10
